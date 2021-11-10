@@ -41,12 +41,16 @@ class BOS():
     def Filterbackporcessing(self):
         pass
     
+    def load_from_mat(self,path):
+        bos01=scio.loadmat(path)
+        self.delta_magnitude=bos01['velocity_magnitude']
+        self.delta_u,self.delta_v=bos01['u_original'], bos01['v_original']
     
 
 if __name__ == '__main__':
     ic.disable()
 
-    bos01=scio.loadmat('01.mat')
+    bos01=scio.loadmat(r'processingdata\01_PIVprocess.mat')
 
     print(bos01.keys())
 
@@ -74,15 +78,13 @@ if __name__ == '__main__':
         line=photon[i,:]  # 取出一行
         line=np.expand_dims(line,axis=1)
         line=np.repeat(line,360,axis=1)
-        #print(line.shape)
-        #cv2.imshow('a',line)
 
         img_back=FBPIRandonTransform(line,len(line[0]),'SL',show=False)
         img_back,ratio,bias=normalize(img_back)
         cv2.imwrite(os.path.join(path_save_img,'{0:03d}.png'.format(i)),img_back)
         imgframe.append(img_back)
         img3D[i,:,:]=img_back
-        #print(img_back.shape)
+ 
         img_back=cv2.resize(img_back,(img_back.shape[1]*5,img_back.shape[0]*5))
         cv2.imshow('p',img_back)
         cv2.waitKey(1)
