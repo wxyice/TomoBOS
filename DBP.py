@@ -66,7 +66,7 @@ def FBPIRandonTransform(image, steps, filter=None, show=True):
         ic(projectionValueFiltered)
         ic(projectionValueRepeat)
 
-        origin[i] = ndimage.rotate(projectionValueRepeat, i*360/steps, reshape=False).astype(np.float64)
+        origin[i] = ndimage.rotate(projectionValueRepeat, i*180/steps, reshape=False).astype(np.float64)
 
         projectionValueRepeat=normalize_image(projectionValueRepeat)
         b=normalize_image(np.sum(origin[:i], axis=0)/i)
@@ -93,31 +93,31 @@ def FBPIRandonTransform(image, steps, filter=None, show=True):
 def LBPIRandonTransform(image, steps):
     # 直接反投影算法
     #定义用于存储重建后的图像的数组
-    channels = len(image[0])
-    print(channels)
+    channels = image.shape[0]
+    #print(channels)
     origin = np.zeros((steps, channels, channels))
     for i in range(steps):
     	#传入的图像中的每一列都对应于一个角度的投影值
     	#这里用的图像是上篇博文里得到的Radon变换后的图像裁剪后得到的
         projectionValue = image[:, i]
-        ic(projectionValue)
+        # ic(projectionValue)
 
         #这里利用维度扩展和重复投影值数组来模拟反向均匀回抹过程
         projectionValueExpandDim = np.expand_dims(projectionValue, axis=0)
-        projectionValueRepeat = projectionValueExpandDim.repeat(channels, axis=0)
+        projectionValueRepeat = projectionValueExpandDim.repeat(channels, axis=0)/channels
 
         origin[i] = ndimage.rotate(projectionValueRepeat, i*180/steps, reshape=False)
         origin[i]=origin[i].astype(np.float64)
 
 
-        cv2.imshow('rrr',projectionValueRepeat)
-        cv2.imshow('ttt',(np.sum(origin[:i], axis=0)/i).astype(np.uint8))
-        cv2.imwrite(os.path.join('LBP','zhong',"LBP{0:03d}.jpg".format(i)),(np.sum(origin[:i], axis=0)/i).astype(np.uint8))
-        cv2.imwrite(os.path.join('LBP','rot',"LBP{0:03d}.jpg".format(i)),origin[i].astype(np.uint8))
-        cv2.imwrite(os.path.join('LBP','singel',"LBP{0:03d}.jpg".format(i)),projectionValueRepeat)
-        cv2.waitKey(3)
+        # cv2.imshow('rrr',projectionValueRepeat)
+        # cv2.imshow('ttt',(np.sum(origin[:i], axis=0)/i).astype(np.uint8))
+        # cv2.imwrite(os.path.join('LBP','zhong',"LBP{0:03d}.jpg".format(i)),(np.sum(origin[:i], axis=0)/i).astype(np.uint8))
+        # cv2.imwrite(os.path.join('LBP','rot',"LBP{0:03d}.jpg".format(i)),origin[i].astype(np.uint8))
+        # cv2.imwrite(os.path.join('LBP','singel',"LBP{0:03d}.jpg".format(i)),projectionValueRepeat)
+        # cv2.waitKey(3)
 
-    iradon = np.sum(origin, axis=0)
+    iradon = np.sum(origin, axis=0)/steps
     return iradon
 
 def normalize_image(image):
@@ -145,7 +145,6 @@ if __name__ == '__main__':
     iradon_SF = FBPIRandonTransform(image, len(image[0]), 'SL')#Filter(channels, 1))
     #print(iradon_SF)
 
-    
     #show_image(image,iradon_LBP)
     #cv2.imwrite("LBP.png",iradon_LBP)
     show_image(image,iradon_RF)
