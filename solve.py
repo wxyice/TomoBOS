@@ -38,7 +38,7 @@ def SD(A,b,epsilon=1e-5,maxiter=1e3):
     return x
 
 
-def CG(A,b,epsilon=1e-5,maxiter=1e3):
+def CG(A,b,epsilon=1e-20,maxiter=1e3):
     iter=0
     x=np.random.random(b.shape)
     r=b-np.matmul(A,x)
@@ -55,7 +55,7 @@ def CG(A,b,epsilon=1e-5,maxiter=1e3):
         r=r1
         #err=np.sum(np.sqrt(r**2))
         err=np.sum(r**2)
-        print('{0:6d} err={1}'.format(iter,err))
+        print('{0:<6d} err={1:.8e}'.format(iter,err))
     
     return x
 
@@ -114,7 +114,7 @@ if __name__ == '__main__':
 
     #x=Guass_Seidel(A,b)
     x=SD(A,b)
-    #x1=CG(A,b)
+    x1=CG(A,b)
 
     #print(x,x1)
 

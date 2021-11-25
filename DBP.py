@@ -98,9 +98,8 @@ def LBPIRandonTransform(image, steps):
     origin = np.zeros((steps, channels, channels))
     for i in range(steps):
     	#传入的图像中的每一列都对应于一个角度的投影值
-    	#这里用的图像是上篇博文里得到的Radon变换后的图像裁剪后得到的
+
         projectionValue = image[:, i]
-        # ic(projectionValue)
 
         #这里利用维度扩展和重复投影值数组来模拟反向均匀回抹过程
         projectionValueExpandDim = np.expand_dims(projectionValue, axis=0)

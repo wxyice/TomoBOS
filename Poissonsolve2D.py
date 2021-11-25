@@ -32,12 +32,12 @@ def grad(x,y,Dx,Dy):
 def cut_domain(domain):
     return domain[1:-1,1:-1].copy()
 
-def buildMatrix(x,y,Dx,Dy,C):
+def buildMatrix(x,y,Dx,Dy,C,boundary):
 
     G=grad(x,y,Dx,Dy)
-    plt.imshow(G,cmap='gray')
-    plt.show()
-    n0=1.0
+    # plt.imshow(G,cmap='gray')
+    # plt.show()
+    n0=boundary
     H,W=Dx.shape
     num=W*H                 # 一共有num个元素，依次按照行编号，每个点i,j的编号为 i*W+j
     A=np.zeros((num,num))
