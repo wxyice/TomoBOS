@@ -8,35 +8,17 @@
 import os
 import shutil
 
-import cv2
 import matplotlib.pyplot as plt
 import numpy as np
-import pydicom
 import scipy.io as scio
-import SimpleITK as sitk
-from cv2 import GaussianBlur, cv2
-from icecream import ic
-from numpy.core.fromnumeric import shape
-from numpy.lib.financial import npv
+from mpl_toolkits.mplot3d import Axes3D
 from openpiv import filters, pyprocess, scaling, tools, validation
-from PIL import Image
 from tqdm import tqdm
 
-from DBP import FBPIRandonTransform, LBPIRandonTransform
+from DBP import LBPIRandonTransform
 from Poissonsolve2D import buildMatrix
-from show3D import plot_3d
 from solve import CG, SD, Gauss_Seidel
-
-from mpl_toolkits.mplot3d import Axes3D
-
-def normalize(img):
-    ratio = (np.max(img) - np.min(img))
-    bias = np.min(img)
-    img = (img - bias) / ratio
-    img = img * 255
-    img = img.astype(np.uint8)
-    return img, ratio, bias
-
+import timeit
 
 class BOS():
     """
@@ -165,7 +147,6 @@ class BOS():
     def slice_show(self, img3D):
         i = 0
         while i < img3D.shape[-1]:
-
             img = img3D[:, :, i]
             print(img.shape, img)
             plt.ion()
@@ -181,30 +162,33 @@ class BOS():
         """
         # x,y,Dx,Dy，xy是坐标位置矩阵，Dx，Dy应该来自于反演后的结果，所得到的B结果还需要一个系数比例C
         # 去除nan数据
-        Dmask = np.isnan(Dx)
-        Dx[Dmask] = 0
-        Dmask = np.isnan(Dy)
-        Dy[Dmask] = 0
+        Dx[np.isnan(Dx)] = 0
+        Dy[np.isnan(Dy)] = 0
 
         A_n, B_n = buildMatrix(x, y, Dx, Dy, self.C_n,boundary=self.n0)
-        #A_rho,B_rho=buildMatrix(x,y,Dx,Dy,self.C_rho,boundary=self.rho0)
         H, W = x.shape
 
-        if solver == 'CG':
-            n = CG(A_n, B_n)
-            #rho=CG(A_rho,B_rho)
-        elif solver == 'SD':
-            n = SD(A_n, B_n, maxiter=3000)
-            #rho=SD(A_rho,B_rho,maxiter=3000)
-        elif solver == 'Gauss_Seidel':
-            n = Gauss_Seidel(A_n, B_n)
-            #rho=Gauss_Seidel(A_rho,B_rho)
+        if solver == 'CG':            n = CG(A_n, B_n,maxiter=1000)
+        elif solver == 'SD':          n = SD(A_n, B_n, maxiter=5000)
+        elif solver == 'Gauss_Seidel':n = Gauss_Seidel(A_n, B_n)
 
         n = n.reshape((H, W))
         rho=(n-1)/self.G
-        # rho=rho.reshape((H,W))
-
         return n,rho
+    
+    def solve_rho_for_all(self,x,y,img3D_u,img3D_v):
+        Z,X,Y=img3D_u.shape
+        n_3D=np.zeros((Z,X,Y))
+        rho_3D=np.zeros((Z,X,Y))
+
+        for slice in tqdm(range(X)):
+            Dx=img3D_u[:,slice,:]
+            Dy=img3D_v[:,slice,:]
+            n,rho=self.solve_rho_for_slice(x,y,Dx,Dy,solver='CG')
+            n_3D[:,slice,:]=n
+            rho_3D[:,slice,:]=rho
+
+        return n_3D, rho_3D
         
     def show_xyuv(self,x,y,u,v,save_dir):
         fig, ax = plt.subplots(2, 2)
@@ -213,27 +197,34 @@ class BOS():
         ax[1][0].imshow(u, cmap='gray'), ax[1][0].set_title('u')
         ax[1][1].imshow(v, cmap='gray'), ax[1][1].set_title('v')
         plt.savefig(os.path.join(save_dir, 'xyuv.jpg'))
+        plt.close()
 
     def show_slicexy(self,sx,sy,save_dir):
         fig, ax = plt.subplots(1, 2)
         ax[0].imshow(sx, cmap='gray')
         ax[1].imshow(sy, cmap='gray')
         plt.savefig(os.path.join(save_dir, 'sxsy.jpg'))
+        plt.close()
 
     def show_line_plt(self,img,save_path=None):
         H,W=img.shape
         X=np.array([i for i in range(W)])
-        #Y=img[line,:]
+        line=50
+        Y=img[line,:]
 
         fig,ax=plt.subplots(1,1)
-        for line in range(H):
-            Y=img[line]
-            ax.plot(X,Y)
+
+        ax.plot(X,Y)
+        # for line in range(H):
+        #     Y=img[line]+line/2e8
+        #     ax.plot(X,Y)
 
         if save_path!=None:
             plt.savefig(os.path.join(save_path,'line.jpg'))
+            plt.close()
         else:
             plt.show()
+            plt.close()
         print('done')
 
     def show_slice_in_3D(self,img):
@@ -251,12 +242,9 @@ class BOS():
         ax.contour(X,Y,Z,zdir='y', offset=6,cmap="rainbow")   #生成y方向投影，投到x-z平面
         plt.show()
 
-        
-
 
 if __name__ == '__main__':
     
-    ic.disable()
     ZD = 0.5
     ZA = 0.5
     f = 0.05
@@ -284,7 +272,6 @@ if __name__ == '__main__':
     os.mkdir(path_for_plt)
     os.mkdir(path_for_result)
 
-
     # initialize the BOS class
     Bos_pipeline = BOS(ZD, ZA, f, n0)
 
@@ -295,18 +282,13 @@ if __name__ == '__main__':
     y = Bos_pipeline.y[0][0]
     u = Bos_pipeline.delta_u[0][0]
     v = Bos_pipeline.delta_v[0][0]
-    Bos_pipeline.show_xyuv(x,y,u,v,path_for_plt)
-    #u = u-10e-6
-    #v = v+10e-6
+    
     # plt.hist(u.reshape(-1,1),bins=100)
     # plt.show()
     # plt.hist(v.reshape(-1,1),bins=100)
     # plt.show()
     
-
-    #img3D=Bos_pipeline.Filterbackporcessing(photon)
-
-    # openPIV
+    # openPIV + LBP
     # path1=r'raw2jpg\back.jpg'
     # path2=r'raw2jpg\test1.jpg'
 
@@ -350,26 +332,37 @@ if __name__ == '__main__':
     # print(img3D_u.shape, img3D_v.shape)
 
     # img3D 的格式[z,x,y] 获取切片
-    Dx = img3D_u[:, 50, :]
-    Dy = img3D_v[:, 50, :]
-    Bos_pipeline.show_slicexy(Dx,Dy,path_for_plt)
+    Dx = img3D_u[:, :, 50]
+    Dy = img3D_v[:, :, 50]
 
 
+    start=timeit.default_timer()
     n,rho = Bos_pipeline.solve_rho_for_slice(x, y, Dx, Dy)
+    end=timeit.default_timer()
 
     np.save(os.path.join(path_for_result,'n.npy'),n)
     np.save(os.path.join(path_for_result,'rho.npy'),rho)
 
-    Bos_pipeline.show_line_plt(n)
+    # print(end-start)
+
+    # n_3D, rho_3D=Bos_pipeline.solve_rho_for_all(x,y,img3D_u,img3D_v)
+    
+    # np.save(os.path.join(path_for_result,'n_3D.npy'),n_3D)
+    # np.save(os.path.join(path_for_result,'rho_3D.npy'),rho_3D)
 
 
-    fig, ax = plt.subplots(1, 2)
-    ax[0].imshow(n, cmap='gray')
-    ax[1].imshow(rho,cmap='gray')
-    ax[0].set_title('n')
-    ax[1].set_title('rho')
-    plt.savefig(os.path.join(path_for_plt, 'n_rho.jpg'))
-    plt.show()
+
+    # Bos_pipeline.show_xyuv(x,y,u,v,path_for_plt)
+    # Bos_pipeline.show_slicexy(Dx,Dy,path_for_plt)
+    # Bos_pipeline.show_line_plt(n)
+
+    # fig, ax = plt.subplots(1, 2)
+    # ax[0].imshow(n, cmap='gray')
+    # ax[1].imshow(rho,cmap='gray')
+    # ax[0].set_title('n')
+    # ax[1].set_title('rho')
+    # plt.savefig(os.path.join(path_for_plt, 'n_rho.jpg'))
+    # plt.show()
 
 
 

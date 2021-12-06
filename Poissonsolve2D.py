@@ -9,8 +9,10 @@ solve the Poisson Function in 2D,
 import numpy as np
 import os
 from matplotlib import pyplot as plt
+import numba
 
 
+@numba.jit(nopython=True,cache=True)
 def grad(x,y,Dx,Dy):
     """
     x,y 是各个控制点的对应真实位置，分别用xy坐标表示，应该来源于标定函数
@@ -32,8 +34,9 @@ def grad(x,y,Dx,Dy):
 def cut_domain(domain):
     return domain[1:-1,1:-1].copy()
 
-def buildMatrix(x,y,Dx,Dy,C,boundary):
 
+@numba.jit(nopython=True,cache=True)
+def buildMatrix(x,y,Dx,Dy,C,boundary):
     G=grad(x,y,Dx,Dy)
     # plt.imshow(G,cmap='gray')
     # plt.show()

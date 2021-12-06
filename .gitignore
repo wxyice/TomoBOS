@@ -139,3 +139,6 @@ debug
 temp
 temp2
 test
+
+*.png
+*.mat
